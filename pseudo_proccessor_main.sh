@@ -11,6 +11,7 @@ organism_tag=$5
 id="${organism_tag}${seqid:3}"
 dnds=$6
 scaffold=$7
+predictor_type=$8
 
 if [[ "$4" != "''" ]]; then ancestor_genome_gbff="$4.gbff"; ancestor_genome_fna="$4.fna"; else ancestor_genome_gbff=""; ancestor_genome_fna=""; fi
 if [[ "$3" != "''"  ]]; then reference_genome_gbff="$3.gbff"; reference_genome_fna="$3.fna"; else reference_genome_gbff=""; reference_genome_fna=""; fi
@@ -24,7 +25,9 @@ seqid=${1##*/}
 organism_tag=$5
 id="${organism_tag}${seqid:3}"
 dnds=$6
-scaffold=$7\n\n"
+scaffold=$7
+predictor_type=$8\n\n"
+
 prokka_pseudos_annotator=./prokka_anno.pl
 
 mkdir -p "$base_dir/rt_output"
@@ -65,72 +68,95 @@ fi
 # # echo "Genome assembly QC,$hours:$minutes:$seconds" >> $base_dir/timer.txt
 # # echo -e "###########################################################################\n"
 
-echo -e "Annotating with Prokka\n" | tee -a "$base_dir/pseudogenome_processing.txt"
-mkdir -p "$base_dir/rt_output/prokka_annotation"
-prokka --cpus $cpus --kingdom "Bacteria" --locustag $id --outdir "$base_dir/rt_output/prokka_annotation" --prefix $id \
-    --strain "$id" \
-    --addgenes --force --compliant "$base_dir/rt_output/ragtag.scaffold_corrected.fasta" \
-    2> $base_dir/Prokka.stdout.txt 1> $base_dir/Prokka.stderr.txt
-#--genus "Mycobacterium" --species "ulcerans"
-success_str=$(grep -o "Annotation finished successfully" $base_dir/Prokka.stdout.txt)
-[[ "$success_str" = "Annotation finished successfully" ]] && echo "Prokka $success_str\n" || \
-    cat $base_dir/Prokka.stdout.txt | tee -a "$base_dir/pseudogenome_processing.txt"
-grep "Walltime used" $base_dir/rt_output/prokka_annotation/$id.log | tee -a "$base_dir/pseudogenome_processing.txt"
-echo -e "################################################################################################\n"
+function prokka_annotation () {
+    echo -e "Annotating with Prokka\n" | tee -a "$base_dir/pseudogenome_processing.txt"
+    mkdir -p "$base_dir/rt_output/prokka_annotation"
+    prokka --cpus $cpus --kingdom "Bacteria" --locustag $id --outdir "$base_dir/rt_output/prokka_annotation" --prefix $id \
+        --strain "$id" \
+        --addgenes --force --compliant "$base_dir/rt_output/ragtag.scaffold_corrected.fasta" \
+        2> $base_dir/Prokka.stdout.txt 1> $base_dir/Prokka.stderr.txt
+    #--genus "Mycobacterium" --species "ulcerans"
+    success_str=$(grep -o "Annotation finished successfully" $base_dir/Prokka.stdout.txt)
+    [[ "$success_str" = "Annotation finished successfully" ]] && echo "Prokka $success_str\n" || \
+        cat $base_dir/Prokka.stdout.txt | tee -a "$base_dir/pseudogenome_processing.txt"
+    grep "Walltime used" $base_dir/rt_output/prokka_annotation/$id.log | tee -a "$base_dir/pseudogenome_processing.txt"
+    echo -e "################################################################################################\n"
+}
 
 #"Pseudogene annotation with Prokka"
-echo -e "Writing pseudogenes with Prokka\n" | tee -a "$base_dir/pseudogenome_processing.txt"
-$prokka_pseudos_annotator "$base_dir/rt_output/prokka_annotation/$id.faa"  \
-    1> $base_dir/Prokka_pseudo.stdout.txt 2> $base_dir/Prokka_pseudo.stderr.txt
-[ -s $base_dir/Prokka_pseudo.stderr.txt ] && cat $base_dir/Prokka_pseudo.stderr.txt || \
-    echo -e "Pseudogenes predicted successfully with Prokka\n" | tee -a "$base_dir/pseudogenome_processing.txt"
-echo -e "################################################################################################\n"
+function prokka_pseudo_annotation () {
+    echo -e "Writing pseudogenes with Prokka\n" | tee -a "$base_dir/pseudogenome_processing.txt"
+    $prokka_pseudos_annotator "$base_dir/rt_output/prokka_annotation/$id.faa"  \
+        1> $base_dir/Prokka_pseudo.stdout.txt 2> $base_dir/Prokka_pseudo.stderr.txt
+    [ -s $base_dir/Prokka_pseudo.stderr.txt ] && cat $base_dir/Prokka_pseudo.stderr.txt || \
+        echo -e "Pseudogenes predicted successfully with Prokka\n" | tee -a "$base_dir/pseudogenome_processing.txt"
+    echo -e "################################################################################################\n"
+}
 
 #Annotating with DFAST
-echo -e "Annotating with DFAST\n" | tee -a "$base_dir/pseudogenome_processing.txt"
-# conda activate 'DFAST'
-if [[ $ancestor_genome_gbff ]]; then
-    dfast --genome "$base_dir/rt_output/ragtag.scaffold_corrected.fasta" --strain "$id" \
-        --locus_tag_prefix "${id}_DF" --reference $ancestor_genome_gbff \
-        --force -o "$base_dir/rt_output/DFAST_output" \
-        1> $base_dir/DFAST.stdout.txt 2> $base_dir/DFAST.stderr.txt
-else
-    dfast --genome "$base_dir/rt_output/ragtag.scaffold_corrected.fasta" --strain "$id" \
-        --locus_tag_prefix "${id}_DF" \
-        --force -o "$base_dir/rt_output/DFAST_output" \
-        1> $base_dir/DFAST.stdout.txt 2> $base_dir/DFAST.stderr.txt
-fi
-checking_error=$(grep "Aborting" $base_dir/DFAST.stdout.txt)
-[ -s $base_dir/DFAST.stderr.txt ] || [[ $checking_error ]] && cat $base_dir/DFAST.stderr.txt || \
-    echo -e "DFAST annotation successful\n" | tee -a "$base_dir/pseudogenome_processing.txt"
-grep "Total running time" $base_dir/rt_output/DFAST_output/application.log | tee -a "$base_dir/pseudogenome_processing.txt"
-echo -e "################################################################################################\n"
+function DFAST_annotation () {
+    echo -e "Annotating with DFAST\n" | tee -a "$base_dir/pseudogenome_processing.txt"
+    # conda activate 'DFAST'
+    if [[ $ancestor_genome_gbff ]]; then
+        dfast --genome "$base_dir/rt_output/ragtag.scaffold_corrected.fasta" --strain "$id" \
+            --locus_tag_prefix "${id}_DF" --reference $ancestor_genome_gbff \
+            --force -o "$base_dir/rt_output/DFAST_output" \
+            1> $base_dir/DFAST.stdout.txt 2> $base_dir/DFAST.stderr.txt
+    else
+        dfast --genome "$base_dir/rt_output/ragtag.scaffold_corrected.fasta" --strain "$id" \
+            --locus_tag_prefix "${id}_DF" \
+            --force -o "$base_dir/rt_output/DFAST_output" \
+            1> $base_dir/DFAST.stdout.txt 2> $base_dir/DFAST.stderr.txt
+    fi
+    checking_error=$(grep "Aborting" $base_dir/DFAST.stdout.txt)
+    [ -s $base_dir/DFAST.stderr.txt ] || [[ $checking_error ]] && cat $base_dir/DFAST.stderr.txt || \
+        echo -e "DFAST annotation successful\n" | tee -a "$base_dir/pseudogenome_processing.txt"
+    grep "Total running time" $base_dir/rt_output/DFAST_output/application.log | tee -a "$base_dir/pseudogenome_processing.txt"
+    echo -e "################################################################################################\n"
+}
 
-#Pseudogene prediction with pseudofinder
-echo -e "Predicting pseudogenes with Pseudofinder using Prokka annotation\n" | tee -a "$base_dir/pseudogenome_processing.txt"
-conda activate "pseudofinder"
-start_PF=`date +%s`
-if [[ $ancestor_genome_gbff ]]; then
-    ~/pseudofinder256/pseudofinder.py annotate --genome "${seqid}/rt_output/prokka_annotation/${id}.gbk" --outprefix "${id}" \
-        --database "~/pseudofinder256/swissprot.dmnd" --threads $cpus --diamond \
-        -ref $ancestor_genome_gbff \
-        -op "$seqid/PF_output" -dnds $dnds \
-        1> $seqid/pseudofinder.stdout.txt 2> $seqid/pseudofinder.stderr.txt
-else
-    ~/pseudofinder256/pseudofinder.py annotate --genome "${seqid}/rt_output/prokka_annotation/${id}.gbk" --outprefix "${id}" \
-        --database "~/pseudofinder256/swissprot.dmnd" --threads $cpus --diamond \
-        -op "$seqid/PF_output" \
-        1> $seqid/pseudofinder.stdout.txt 2> $seqid/pseudofinder.stderr.txt
+Pseudogene prediction with pseudofinder
+function pseudofinder_prediction () {
+    echo -e "Predicting pseudogenes with Pseudofinder using Prokka annotation\n" | tee -a "$base_dir/pseudogenome_processing.txt"
+    conda activate "pseudofinder"
+    start_PF=`date +%s`
+    if [[ $ancestor_genome_gbff ]]; then
+        ~/pseudofinder256/pseudofinder.py annotate --genome "${seqid}/rt_output/prokka_annotation/${id}.gbk" --outprefix "${id}" \
+            --database "~/pseudofinder256/swissprot.dmnd" --threads $cpus --diamond \
+            -ref $ancestor_genome_gbff \
+            -op "$seqid/PF_output" -dnds $dnds \
+            1> $seqid/pseudofinder.stdout.txt 2> $seqid/pseudofinder.stderr.txt
+    else
+        ~/pseudofinder256/pseudofinder.py annotate --genome "${seqid}/rt_output/prokka_annotation/${id}.gbk" --outprefix "${id}" \
+            --database "~/pseudofinder256/swissprot.dmnd" --threads $cpus --diamond \
+            -op "$seqid/PF_output" \
+            1> $seqid/pseudofinder.stdout.txt 2> $seqid/pseudofinder.stderr.txt
+    fi
+    [ -s $seqid/pseudofinder.stderr.txt ] && cat $seqid/pseudofinder.stderr.txt || \
+        echo -e "Pseudogenes predicted successfully with Pseudofinder\n" | tee -a "$base_dir/pseudogenome_processing.txt"
+    mkdir -p "$base_dir/pseudofinder"
+    mv -f $base_dir/PF_* $base_dir/pseudofinder
+    end_PF=`date +%s`
+    PF_runtime=$((end_PF-start_PF))
+    hours=$((PF_runtime / 3600)); minutes=$(( (PF_runtime % 3600) / 60 )); seconds=$(( (PF_runtime % 3600) % 60 )) 
+    echo "Pseudofinder PF_runtime: $hours:$minutes:$seconds (hh:mm:ss)" | tee -a "$base_dir/pseudogenome_processing.txt"
+    echo -e "################################################################################################\n"
+}
+
+if [[ "$predictor_type" = "prokka" ]]; then
+    prokka_annotation
+    prokka_pseudo_annotation
+elif [[ "$predictor_type" = "PF" ]]; then
+    prokka_annotation
+    pseudofinder_prediction
+elif [[ "$predictor_type" = "DFAST" ]]; then
+    DFAST_annotation
+elif [[ "$predictor_type" = "all" ]]; then
+    prokka_annotation
+    prokka_pseudo_annotation
+    pseudofinder_prediction
+    DFAST_annotation
 fi
-[ -s $seqid/pseudofinder.stderr.txt ] && cat $seqid/pseudofinder.stderr.txt || \
-    echo -e "Pseudogenes predicted successfully with Pseudofinder\n" | tee -a "$base_dir/pseudogenome_processing.txt"
-mkdir -p "$base_dir/pseudofinder"
-mv -f $base_dir/PF_* $base_dir/pseudofinder
-end_PF=`date +%s`
-PF_runtime=$((end_PF-start_PF))
-hours=$((PF_runtime / 3600)); minutes=$(( (PF_runtime % 3600) / 60 )); seconds=$(( (PF_runtime % 3600) % 60 )) 
-echo "Pseudofinder PF_runtime: $hours:$minutes:$seconds (hh:mm:ss)" | tee -a "$base_dir/pseudogenome_processing.txt"
-echo -e "################################################################################################\n"
 
 #Processing of predicted pseudogenes
 echo -e "Extracting predicted pseudogenes from all tools\n" | tee -a "$base_dir/pseudogenome_processing.txt"

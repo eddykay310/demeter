@@ -3,24 +3,128 @@ start=`date +%s`
 
 conda activate "bactopia_manually"
 
-mkdir -p $1
-base_dir=$(realpath $1)
-echo -e "Starting $1\n"
-# base_dir=$1
-runtype=$2 #either blank for PE or any letter for SE; preferably SE
-[ "$runtype" = "SE" ] && echo "Using single-end reads" || echo "Using paired-end reads"
-cpus=$3
-ram=$4
-assembly_qc_method=$5
-! [[ -z "$reference_genome" ]] && reference_genome=$(realpath $6) || reference_genome="''"
-! [[ -z "$ancestor_genome" ]]  &&  ancestor_genome=$(realpath $7) || ancestor_genome="''"
-dnds=$8
-organism_tag=$9
-keep_transposease="${10}"
-stage="${11}"
-scaffold="${12}"
+help()
+{
+    echo "Usage: source main.sh [ -f | --fasta ID ]
+               [ -rt | --runtype ]
+               [ -c | --cpus ]
+               [ -rm | --ram ]
+               [ -aq | --assembly_qc ]
+               [ -ref | --reference_genome ]
+               [ -anc | --ancestor_genome ]
+               [ -d | --dnds ]
+               [ -ot | --organism_tag ]
+               [ -kt | --keep_transposease ]
+               [ -ps | --pipeline_stage ]
+               [ -s | --scaffold_genome ]
+               [ -pt | --pseudogene_predictor ]
+               [ -h | --help ]"
 
-printf "base_dir=$base_dir
+    set -e
+}
+
+SHORT=-f:,rt:,c:,rm:,aq:,ref:,anc:,d:,ot:,kt:,ps:,s:,pt:,h
+LONG=fastaID:,runtype:,cpus:,ram:,assembly_qc:,reference_genome:,ancestor_genome:,\
+    dnds:,organism_tag:,keep_transposease:,pipeline_stage:,scaffold_genome:,pseudogene_predictor:,help
+OPTS=$(getopt -a -n main --options $SHORT --longoptions $LONG -- "$@")
+
+VALID_ARGUMENTS=$# # Returns the count of arguments that are in short or long options
+
+if [ "$VALID_ARGUMENTS" -eq 0 ]; then
+  help
+fi
+
+eval set -- "$OPTS"
+
+while :
+do
+  case "$1" in
+    -f | --fastaID )
+      seqid="$2"
+      shift 2
+      ;;
+    -rt | --runtype )
+      runtype="$2"
+      shift 2
+      ;;
+    -c | --cpus )
+        cpus="$2"
+        shift 2
+        ;;
+    -rm | --ram )
+        ram="$2"
+        shift 2
+        ;;
+    -aq | --assembly_qc )
+        assembly_qc_method="$2"
+        shift 2
+        ;;
+    -ref | --reference_genome )
+        reference_genome="$2"
+        shift 2
+        ;;
+    -anc | --ancestor_genome )
+        ancestor_genome="$2"
+        shift 2
+        ;;
+    -d | --dnds )
+        dnds="$2"
+        shift 2
+        ;;    
+    -ot | --organism_tag  )
+        organism_tag="$2"
+        shift 2
+        ;;    
+    -kt | --keep_transposease )
+        keep_transposease="$2"
+        shift 2
+        ;;    
+    -ps | --pipeline_stage )
+        stage="$2"
+        shift 2
+        ;;    
+    -s | --scaffold_genome )
+        scaffold="$2"
+        shift 2
+        ;;   
+    -pt | --pseudogene_predictor )
+        predictor_type="$2"
+        shift 2
+        ;;   
+    -h | --help)
+      help
+      ;;
+    --)
+      shift;
+      break
+      ;;
+    *)
+      echo "Unexpected option: $1"
+      help
+      ;;
+  esac
+done
+
+app_dir=$(realpath main.sh)
+mkdir -p $seqid
+base_dir=$(realpath $seqid)
+echo -e "Starting $seqid\n"
+# base_dir=$1
+# runtype=$2 #either blank for PE or any letter for SE; preferably SE
+[ "$runtype" = "SE" ] && echo "Using single-end reads" || echo "Using paired-end reads"
+# cpus=$3
+# ram=$4
+# assembly_qc_method=$5
+! [[ -z "$reference_genome" ]] && reference_genome=$(realpath $reference_genome) || reference_genome="''"
+! [[ -z "$ancestor_genome" ]]  &&  ancestor_genome=$(realpath $ancestor_genome) || ancestor_genome="''"
+# dnds=$8
+# organism_tag=$9
+# keep_transposease="${10}"
+# stage="${11}"
+# scaffold="${12}"
+
+printf "app_dir=app_dir
+base_dir=$base_dir
 runtype=$2
 cpus=$3
 ram=$4
@@ -31,7 +135,8 @@ dnds=$8
 organism_tag=$9
 keep_transposease="${10}"
 stage="${11}"
-scaffold="${12}"\n\n"
+scaffold="${12}"
+predictor_type="${predictor_type}"\n\n"
 
 re='^[0-9]+$'
 if [ $cpus ] ;then cpus=$cpus; elif [[ "$cpus" =~ "$re" ]] ; then echo -e 'Enter a number as input for the number of cpus to be used'; fi
@@ -91,7 +196,7 @@ if [ $stage -le 5 ]; then
     echo -e "###########################################################################\n"
     echo -e "Predicting pseudogenome\n"
     start_pseudogene_proc=`date +%s`
-    source ./pseudo_proccessor_main.sh $base_dir $cpus $reference_genome $ancestor_genome $organism_tag $dnds $scaffold
+    source ./pseudo_proccessor_main.sh $base_dir $cpus $reference_genome $ancestor_genome $organism_tag $dnds $scaffold $predictor_type
     end_pseudogene_proc=`date +%s`
     runtime=$((end_pseudogene_proc-start_pseudogene_proc))
     hours=$((runtime / 3600)); minutes=$(( (runtime % 3600) / 60 )); seconds=$(( (runtime % 3600) % 60 )) 
@@ -104,7 +209,7 @@ if [ $stage -le 6 ]; then
     echo -e "###########################################################################\n"
     echo -e "Cleaning and writing pseudogenome\n"
     start_pseudogene_cleaning=`date +%s`
-    source ./cleaning_pseudogenome.sh $base_dir $organism_tag $keep_transposease
+    source ./cleaning_pseudogenome.sh $base_dir $organism_tag $keep_transposease $predictor_type
     end_pseudogene_cleaning=`date +%s`
     runtime=$((end_pseudogene_cleaning-start_pseudogene_cleaning))
     hours=$((runtime / 3600)); minutes=$(( (runtime % 3600) / 60 )); seconds=$(( (runtime % 3600) % 60 )) 

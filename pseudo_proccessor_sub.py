@@ -11,6 +11,7 @@ PF_gbff = sys.argv[3]
 prokka_pseudos = sys.argv[4]
 output_dir = sys.argv[5]
 # output_dir2 = sys.argv[6] # future additional input for different pipelines
+predictor_type = sys.argv[6]
 
 
 cd = output_dir
@@ -120,7 +121,7 @@ def get_DFAST_pseudos(file_path):
     print("Writing all DFAST CDS to fasta file \n")
     counter = 0
     with open(f"{cd}/DFAST_cdsAA.fasta", "w") as output:
-        for index,series in cds.iterrows():
+        for _,series in cds.iterrows():
     #         print(key,value[0])
             if not pd.isna(series.translation):
                 output.write(f'>{series.locus_tag} {series.location}\n{series.translation}\n')
@@ -131,7 +132,7 @@ def get_DFAST_pseudos(file_path):
     print("Writing all DFAST pseudos CDS to fasta file \n")
     counterDFAST = 0
     with open(f"{cd}/DFAST_pseudos_cdsAA.fasta", "w") as output:
-        for index,series in DFAST_pseuds.iterrows():
+        for _,series in DFAST_pseuds.iterrows():
     #         print(key,value[0])
             if not pd.isna(series.translation):
                 output.write(f'>{series.locus_tag} {series.location}\n{series.translation}\n')
@@ -270,7 +271,7 @@ def get_prokka_cds(file_path):
     cds = file_path
     
     with open(f"{cd}/prokka_cdsAA.fasta", "w") as output:
-        for index,series in cds.iterrows():
+        for _,series in cds.iterrows():
     #         print(key,value[0])
             if not pd.isna(series.translation):
                 output.write(f'>{series.locus_tag} {series.location}\n{series.translation}\n')
@@ -315,47 +316,79 @@ def get_prokka_pseudos(file_path,reference_gbkcsv):
 
 ################### Combining Pseudogene AA sequences ######################
 
-def combining_all_pseudos():
+def combined_pseudos_writer(pseudo_filename,outfile):
+    # Open each file in read mode
+    with open(f'{output_path}/{pseudo_filename}') as infile:
+
+        # read the data from file1 and
+        # file2 and write it in file3
+        outfile.write(infile.read())
+
+    # Add '\n' to enter data of file2
+    # from next line
+    outfile.write("\n")
+
+def combining_all_pseudos(predictor_type='all'):
     
     print("Combining pseudogenes into single fasta file \n")
     all_filenames = ["PF_pseudos_cdsAA.fasta","prokka_pseudos_cdsAA.fasta","DFAST_pseudos_cdsAA.fasta"]
 
     # Open file3 in write mode
     with open(f'{output_path}/combined_pseudos.fasta', 'w') as outfile:
-    
-        # Iterate through list
-        for names in all_filenames:
-    
-            # Open each file in read mode
-            with open(f'{output_path}/{names}') as infile:
-    
-                # read the data from file1 and
-                # file2 and write it in file3
-                outfile.write(infile.read())
-    
-            # Add '\n' to enter data of file2
-            # from next line
-            outfile.write("\n")
+
+        if predictor_type == 'all':
+            # Iterate through list
+            for names in all_filenames:
+                combined_pseudos_writer(names,outfile)
+        elif predictor_type == 'PF':
+            combined_pseudos_writer(all_filenames[0],outfile)
+        elif predictor_type == 'prokka':
+            combined_pseudos_writer(all_filenames[1],outfile)
+        elif predictor_type == 'DFAST':
+            combined_pseudos_writer(all_filenames[2],outfile)
             
+if predictor_type == 'all':
+    DFAST_gbkcsv = gbk2csv(DFAST_gbk_dir)
+    prokka_gbkcsv = gbk2csv(prokka_gbk_dir)
+    prokka_gbkcsv_cds = gbk2csv_cds(prokka_gbk_dir)
+    DFAST_gbkcsv_cds = gbk2csv_cds(DFAST_gbk_dir)
+
+    counterDFAST = get_DFAST_pseudos(DFAST_gbkcsv_cds)
+    # # get_DFAST_pseudos(f"{DFAST_gbk_dir}_genome.csv")
+    get_prokka_cds(prokka_gbkcsv_cds)
 
 
-DFAST_gbkcsv = gbk2csv(DFAST_gbk_dir)
-prokka_gbkcsv = gbk2csv(prokka_gbk_dir)
-prokka_gbkcsv_cds = gbk2csv_cds(prokka_gbk_dir)
-DFAST_gbkcsv_cds = gbk2csv_cds(DFAST_gbk_dir)
+    old_loc_tags = get_PF_old_loc_tags(PF_gbff) #working with a few tweaks
+    counterPF = get_PF_pseudos(old_loc_tags,prokka_gbkcsv)
 
-counterDFAST = get_DFAST_pseudos(DFAST_gbkcsv_cds)
-# # get_DFAST_pseudos(f"{DFAST_gbk_dir}_genome.csv")
-get_prokka_cds(prokka_gbkcsv_cds)
+    counterPK = get_prokka_pseudos(prokka_pseudos,prokka_gbkcsv) #working with a few tweaks
 
+    combining_all_pseudos()
 
-old_loc_tags = get_PF_old_loc_tags(PF_gbff) #working with a few tweaks
-counterPF = get_PF_pseudos(old_loc_tags,prokka_gbkcsv)
+    counter = counterDFAST + counterPF + counterPK        
+    print(f'{counter} pseudogenes written to combined fasta file \n')
 
+elif predictor_type == 'PF':
+    prokka_gbkcsv = gbk2csv(prokka_gbk_dir)
+    prokka_gbkcsv_cds = gbk2csv_cds(prokka_gbk_dir)
 
-counterPK = get_prokka_pseudos(prokka_pseudos,prokka_gbkcsv) #working with a few tweaks
+    get_prokka_cds(prokka_gbkcsv_cds)
+    old_loc_tags = get_PF_old_loc_tags(PF_gbff) #working with a few tweaks
+    counterPF = get_PF_pseudos(old_loc_tags,prokka_gbkcsv)
+    print(f'{counterPF} pseudogenes written to combined fasta file \n')
+    combining_all_pseudos('PF')
 
-combining_all_pseudos()
+elif predictor_type == 'prokka':
+    prokka_gbkcsv = gbk2csv(prokka_gbk_dir)
+    prokka_gbkcsv_cds = gbk2csv_cds(prokka_gbk_dir)
+    get_prokka_cds(prokka_gbkcsv_cds)
+    counterPK = get_prokka_pseudos(prokka_pseudos,prokka_gbkcsv) #working with a few tweaks    
+    print(f'{counterPK} pseudogenes written to combined fasta file \n')
+    combining_all_pseudos('prokka')
 
-counter = counterDFAST + counterPF + counterPK        
-print(f'{counter} pseudogenes written to combined fasta file \n')
+elif predictor_type == 'DFAST':
+    DFAST_gbkcsv = gbk2csv(DFAST_gbk_dir)
+    DFAST_gbkcsv_cds = gbk2csv_cds(DFAST_gbk_dir)
+    counterDFAST = get_DFAST_pseudos(DFAST_gbkcsv_cds)
+    print(f'{counterDFAST} pseudogenes written to combined fasta file \n')
+    combining_all_pseudos('DFAST')
