@@ -2,8 +2,7 @@
 
 seqid=$1
 seqid_short=${seqid##*/}
-organism_tag=$2
-id="${organism_tag}${seqid_short:3}"
+id="$2"
 keep_transposease=$3
 predictor_type=$4
 
@@ -78,4 +77,4 @@ elif [[ "$predictor_type" = "all" ]]; then
     echo "Pseudogenome size = $(grep -c ">" ${seqid}/combined_pseudogenome_unique.txt)"
 fi
 
-source ./writing_pseudo_files.sh $seqid $seqid_short $organism_tag $predictor_type
+source ${0%/*}/writing_pseudo_files.sh $seqid $id $predictor_type

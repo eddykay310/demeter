@@ -1,33 +1,43 @@
 #!/bin/bash
 
 seqid=$1
-organism_tag=$3
-id="${organism_tag}${2:3}"
-predictor_type=$4
+id="$2"
+predictor_type=$3
 #id=$seqid
+root_base_dir=${seqid%/*}
+# echo "$root_base_dir\n"
+mkdir -p "$root_base_dir/pan_files"
+
 
 echo -e "\nWriting pseudogenome gff, faa and fna"
-mkdir -p "pan-pseudogenome/gffs"
+mkdir -p "$root_base_dir/pan_files/pan-pseudogenome/gffs"
 
 # writing gff header
-LC_ALL=C grep "^##" $seqid/rt_output/prokka_annotation/$id.gff | head -n -1 > pan-pseudogenome/gffs/${id}.gff 
+LC_ALL=C grep "^##" $seqid/rt_output/prokka_annotation/$id.gff | head -n -1 > $root_base_dir/pan_files/pan-pseudogenome/gffs/${id}.gff 
 
-ids=$( grep "DF" ${seqid}/combined_pseudogenome_unique.txt | cut -d' ' -f1 | tr -d '>' )
+function DFAST_gff_writer () {
+    ids=$( grep "DF" ${seqid}/combined_pseudogenome_unique.txt | cut -d' ' -f1 | tr -d '>' )
 
-ids1=$( grep -v "DF" ${seqid}/combined_pseudogenome_unique.txt | cut -d' ' -f1 | sed 's/PF_//' | tr -d '>' | sort )
-#grep -v "DF" ${seqid}/combined_pseudogenome_unique.txt | cut -d' ' -f1 | sed 's/PF_//' | tr -d '>' | sort | sed 's/>//' 
-#grep -v "DF" ${seqid}/combined_pseudogenome_unique.txt | cut -d' ' -f1 | sed 's/PF_//' | tr -d '>' #| xargs printf "%s|" #| head -c -1 
+    # writing records from original annotation files
+    #TO-DO Find a better way to eliminate all duplicate ids that affect roary analysis
+    LC_ALL=C egrep -h "$ids" $seqid/rt_output/DFAST_output/genome.gff >> $root_base_dir/pan_files/pan-pseudogenome/gffs/${id}.gff
 
-# writing records from original annotation files
-#TO-DO Find a better way to eliminate all duplicate ids that affect roary analysis
-LC_ALL=C egrep -h "$ids" $seqid/rt_output/DFAST_output/genome.gff >> pan-pseudogenome/gffs/${id}.gff
+    # writing genome sequence at the end of gff file
+    sed -n '/^##FASTA/,$p' $seqid/rt_output/DFAST_output/genome.gff >> $root_base_dir/pan_files/pan-pseudogenome/gffs/${id}.gff
+}
 
-LC_ALL=C egrep -h "$ids1" $seqid/rt_output/prokka_annotation/$id.gff | sed '/#sequence/d' | sed '/>/d' >> pan-pseudogenome/gffs/${id}.gff
+function prokka_gff_writer () {
+    ids1=$( grep -v "DF" ${seqid}/combined_pseudogenome_unique.txt | cut -d' ' -f1 | sed 's/PF_//' | tr -d '>' | sort )
+    #grep -v "DF" ${seqid}/combined_pseudogenome_unique.txt | cut -d' ' -f1 | sed 's/PF_//' | tr -d '>' | sort | sed 's/>//' 
+    #grep -v "DF" ${seqid}/combined_pseudogenome_unique.txt | cut -d' ' -f1 | sed 's/PF_//' | tr -d '>' #| xargs printf "%s|" #| head -c -1 
 
-# writing genome sequence at the end of gff file
-sed -n '/^##FASTA/,$p' $seqid/rt_output/DFAST_output/genome.gff >> pan-pseudogenome/gffs/${id}.gff
+    # writing records from original annotation files
+    #TO-DO Find a better way to eliminate all duplicate ids that affect roary analysis
+    LC_ALL=C egrep -h "$ids1" $seqid/rt_output/prokka_annotation/$id.gff | sed '/#sequence/d' | sed '/>/d' >> $root_base_dir/pan_files/pan-pseudogenome/gffs/${id}.gff
 
-sed -e '1,/^##FASTA/ d' $seqid/rt_output/prokka_annotation/$id.gff >> pan-pseudogenome/gffs/${id}.gff
+    # writing genome sequence at the end of gff file
+    sed -e '1,/^##FASTA/ d' $seqid/rt_output/prokka_annotation/$id.gff >> $root_base_dir/pan_files/pan-pseudogenome/gffs/${id}.gff
+}
 
 # linearize fastas (prokka and DFAST)
 [[ -f $seqid/rt_output/prokka_annotation/$id.linear.faa && -f $seqid/rt_output/DFAST_output/$id.linear.cds.fna ]] && echo -e "\nLinear fasta files present\n" || \
@@ -43,27 +53,55 @@ sed -e '1,/^##FASTA/ d' $seqid/rt_output/prokka_annotation/$id.gff >> pan-pseudo
 
 for genome in pseudogenome functional_genome; do
     # writing fastas
-    mkdir -p "$genome/faas"
-    mkdir -p "$genome/fnas"
-    ids2=$(grep -v 'DF' "${seqid}/combined_pseudogenome_unique.txt"  | cut -d' ' -f1 | sed 's/PF_//')
-    ids3=$(grep 'DF' "${seqid}/combined_pseudogenome_unique.txt"  | cut -d' ' -f1)
+    mkdir -p "$root_base_dir/pan_files/$genome/faas"
+    mkdir -p "$root_base_dir/pan_files/$genome/fnas"
+
+    if [[ "$predictor_type" = "prokka" ]] || [[ "$predictor_type" = "PF" ]]; then
+        ids2=$(grep -v 'DF' "${seqid}/combined_pseudogenome_unique.txt"  | cut -d' ' -f1 | sed 's/PF_//')
+    elif [[ "$predictor_type" = "DFAST" ]]; then
+        ids3=$(grep 'DF' "${seqid}/combined_pseudogenome_unique.txt"  | cut -d' ' -f1)
+    elif [[ "$predictor_type" = "all" ]]; then
+        ids2=$(grep -v 'DF' "${seqid}/combined_pseudogenome_unique.txt"  | cut -d' ' -f1 | sed 's/PF_//')
+        ids3=$(grep 'DF' "${seqid}/combined_pseudogenome_unique.txt"  | cut -d' ' -f1)
+    fi
+
     if [[ "$genome" = "pseudogenome" ]]; then
-        idstwo_count=$(grep -c ">" <<< $ids2)
-        idsthree_count=$(grep -c ">" <<< $ids3)
-        pseuds=$(( idstwo_count + idsthree_count ))        
-        # faa
-        grep -A 1 "$ids2" "$seqid/rt_output/prokka_annotation/$id.linear.faa" --no-group-separator > "$genome/faas/${id}.faa"
-        grep -A 1 "$ids3" "$seqid/rt_output/DFAST_output/$id.linear.protein.faa" --no-group-separator >> "$genome/faas/${id}.faa"
-        # fna
-        grep -A 1 "$ids2"  "$seqid/rt_output/prokka_annotation/$id.linear.ffn" --no-group-separator > "$genome/fnas/${id}.fna"
-        grep -A 1 "$ids3" "$seqid/rt_output/DFAST_output/$id.linear.cds.fna" --no-group-separator >> "$genome/fnas/${id}.fna"
+
+        if [[ "$predictor_type" = "prokka" ]] || [[ "$predictor_type" = "PF" ]]; then
+            idstwo_count=$(grep -c ">" <<< $ids2)
+            pseuds=$idstwo_count
+            # faa
+            grep -A 1 "$ids2" "$seqid/rt_output/prokka_annotation/$id.linear.faa" --no-group-separator > "$root_base_dir/pan_files/$genome/faas/${id}.faa"
+            # fna
+            grep -A 1 "$ids2"  "$seqid/rt_output/prokka_annotation/$id.linear.ffn" --no-group-separator > "$root_base_dir/pan_files/$genome/fnas/${id}.fna"
+            
+        elif [[ "$predictor_type" = "DFAST" ]]; then
+            idsthree_count=$(grep -c ">" <<< $ids3)
+            pseuds=$idsthree_count
+            # faa
+            grep -A 1 "$ids3" "$seqid/rt_output/DFAST_output/$id.linear.protein.faa" --no-group-separator >> "$root_base_dir/pan_files/$genome/faas/${id}.faa"
+            # fna
+            grep -A 1 "$ids3" "$seqid/rt_output/DFAST_output/$id.linear.cds.fna" --no-group-separator >> "$root_base_dir/pan_files/$genome/fnas/${id}.fna"
+        
+        elif [[ "$predictor_type" = "all" ]]; then
+            idstwo_count=$(grep -c ">" <<< $ids2)
+            idsthree_count=$(grep -c ">" <<< $ids3)
+            pseuds=$(( idstwo_count + idsthree_count ))        
+            # faa
+            grep -A 1 "$ids2" "$seqid/rt_output/prokka_annotation/$id.linear.faa" --no-group-separator > "$root_base_dir/pan_files/$genome/faas/${id}.faa"
+            grep -A 1 "$ids3" "$seqid/rt_output/DFAST_output/$id.linear.protein.faa" --no-group-separator >> "$root_base_dir/pan_files/$genome/faas/${id}.faa"
+            # fna
+            grep -A 1 "$ids2"  "$seqid/rt_output/prokka_annotation/$id.linear.ffn" --no-group-separator > "$root_base_dir/pan_files/$genome/fnas/${id}.fna"
+            grep -A 1 "$ids3" "$seqid/rt_output/DFAST_output/$id.linear.cds.fna" --no-group-separator >> "$root_base_dir/pan_files/$genome/fnas/${id}.fna"
+        fi
+    
     elif [[ "$genome" = "functional_genome" ]]; then
         echo -e "Writing functional genome files"
         # all=$(grep ">" "$seqid/rt_output/prokka_annotation/$id.linear.faa")
         # func=$(grep -v "$ids2" <<< $all | cut -d' ' -f1 | tr -d '>') 
         all=$(grep -c ">" "$seqid/rt_output/prokka_annotation/$id.linear.faa")
         func=$(( all - pseuds ))
-        echo -e "$all, $func"
+        echo -e "Whole genome => $all, Functional genome => $func"
         # grep -c "KO" <<< $ids2
         # grep -c "KO" <<< $func
         # # faa
@@ -81,30 +119,33 @@ for genome in pseudogenome functional_genome; do
         # grep -c -A 1 "$func"  "$seqid/rt_output/prokka_annotation/$id.linear.ffn" --no-group-separator > "$genome/fnas/${id}.fna"
         # # grep -A 1 -v "$ids3" "$seqid/rt_output/DFAST_output/$id.linear.cds.fna" --no-group-separator >> "$genome/fnas/${id}.fna"
 
-        cd-hit-2d -i pseudogenome/faas/${id}.faa -i2 ${seqid}/rt_output/prokka_annotation/${id}.linear.faa \
-            -o $genome/faas/${id}_cdhit -c 0.99 -n 5 -g 1 -M 2000 -T 4 > $genome/faas/func_genome_analysis.log
-        mv $genome/faas/${id}_cdhit $genome/faas/${id}.faa
+        # echo $CONDA_DEFAULT_ENV
+        conda activate "bactopia_manually"
+        cd-hit-2d -i $root_base_dir/pan_files/pseudogenome/faas/${id}.faa -i2 ${seqid}/rt_output/prokka_annotation/${id}.linear.faa \
+            -o $root_base_dir/pan_files/$genome/faas/${id}_cdhit -c 0.99 -n 5 -g 1 -M 2000 -T 4 > $root_base_dir/pan_files/$genome/faas/func_genome_analysis.log
+        mv $root_base_dir/pan_files/$genome/faas/${id}_cdhit $root_base_dir/pan_files/$genome/faas/${id}.faa
 
-        cd-hit-est-2d -i pseudogenome/fnas/${id}.fna -i2 ${seqid}/rt_output/prokka_annotation/${id}.linear.ffn \
-            -o $genome/fnas/${id}_cdhit -c 0.99 -n 8 -g 1 -M 2000 -T 4 > $genome/fnas/func_genome_analysis.log
-        mv $genome/fnas/${id}_cdhit $genome/fnas/${id}.fna 
-        rm $genome/faas/${id}_cdhit.clstr $genome/fnas/${id}_cdhit.clstr
-        faa=$(grep -c ">" $genome/faas/${id}.faa)
-        fna=$(grep -c ">" $genome/fnas/${id}.fna)
-        echo -e "$faa, $fna\n"
+        cd-hit-est-2d -i $root_base_dir/pan_files/pseudogenome/fnas/${id}.fna -i2 ${seqid}/rt_output/prokka_annotation/${id}.linear.ffn \
+            -o $root_base_dir/pan_files/$genome/fnas/${id}_cdhit -c 0.99 -n 8 -g 1 -M 2000 -T 4 > $root_base_dir/pan_files/$genome/fnas/func_genome_analysis.log
+        mv $root_base_dir/pan_files/$genome/fnas/${id}_cdhit $root_base_dir/pan_files/$genome/fnas/${id}.fna 
+        rm $root_base_dir/pan_files/$genome/faas/${id}_cdhit.clstr $root_base_dir/pan_files/$genome/fnas/${id}_cdhit.clstr
+
+        faa=$(grep -c ">" $root_base_dir/pan_files/$genome/faas/${id}.faa)
+        fna=$(grep -c ">" $root_base_dir/pan_files/$genome/fnas/${id}.fna)
+        echo -e "$faa and $fna prokka-based functional proteins and genes respectively\n"
         if [ $faa -ne $fna ]; then
             if [  $faa -eq $func ]; then
                 # takes its ids and get them from fna
-                faa_all=$(grep ">" "$genome/faas/${id}.faa" | cut -d' ' -f1 | tr -d '>')
-                grep -A 1 "$faa_all" $genome/fnas/${id}.fna > $genome/fnas/${id}_.fna 
-                mv $genome/fnas/${id}_.fna $genome/fnas/${id}.fna 
-                grep -c ">" "$genome/fnas/${id}.fna"
+                faa_all=$(grep ">" "$root_base_dir/pan_files/$genome/faas/${id}.faa" | cut -d' ' -f1 | tr -d '>')
+                grep -A 1 "$faa_all" $root_base_dir/pan_files/$genome/fnas/${id}.fna > $root_base_dir/pan_files/$genome/fnas/${id}_.fna 
+                mv $root_base_dir/pan_files/$genome/fnas/${id}_.fna $root_base_dir/pan_files/$genome/fnas/${id}.fna 
+                grep -c ">" "$root_base_dir/pan_files/$genome/fnas/${id}.fna"
             elif [ $fna -eq $func ]; then
                 # takes its ids and get them from faa
-                fnaa_all=$(grep ">" "$genome/fnas/${id}.fna" | cut -d' ' -f1 | tr -d '>')
-                grep -A 1 "$faa_all" $genome/faas/${id}.faa > $genome/faas/${id}_.faa
-                mv $genome/faas/${id}_.faa $genome/faas/${id}.faa
-                grep -c ">" "$genome/faas/${id}.faa"
+                fnaa_all=$(grep ">" "$root_base_dir/pan_files/$genome/fnas/${id}.fna" | cut -d' ' -f1 | tr -d '>')
+                grep -A 1 "$faa_all" $root_base_dir/pan_files/$genome/faas/${id}.faa > $root_base_dir/pan_files/$genome/faas/${id}_.faa
+                mv $root_base_dir/pan_files/$genome/faas/${id}_.faa $root_base_dir/pan_files/$genome/faas/${id}.faa
+                grep -c ">" "$root_base_dir/pan_files/$genome/faas/${id}.faa"
             fi
         fi
     fi
@@ -112,8 +153,9 @@ done
 
 # copying whole genome files
 echo -e "Copying whole genome files\n"
-mkdir -p whole_genome/faas whole_genome/fnas whole_genome/gffs 
-id="${seqid##*/}"; id="KO${id:3}" 
-cp $seqid/rt_output/prokka_annotation/$id.linear.faa whole_genome/faas/$id.faa 
-cp $seqid/rt_output/prokka_annotation/$id.linear.ffn whole_genome/fnas/$id.fna 
-cp $seqid/rt_output/prokka_annotation/$id.gff whole_genome/gffs/$id.gff 
+mkdir -p $root_base_dir/pan_files/whole_genome/faas $root_base_dir/pan_files/whole_genome/fnas \
+    $root_base_dir/pan_files/whole_genome/gffs 
+#id="${seqid##*/}"; id="$id" 
+cp $seqid/rt_output/prokka_annotation/$id.linear.faa $root_base_dir/pan_files/whole_genome/faas/$id.faa 
+cp $seqid/rt_output/prokka_annotation/$id.linear.ffn $root_base_dir/pan_files/whole_genome/fnas/$id.fna 
+cp $seqid/rt_output/prokka_annotation/$id.gff $root_base_dir/pan_files/whole_genome/gffs/$id.gff 

@@ -10,7 +10,8 @@ cpus=$2
 echo "Using $cpus threads"
 assembly_qc_method=$3
 [[ $assembly_qc_method ]] && u50=$assembly_qc_method || u50=''
-id="${4}${seqid:3}"
+# id="${4}${seqid:3}"
+id="${4}
 
 GENOME_SIZE_OUTPUT="$base_dir/${seqid}-genome-size.txt"
 seq_pair_sizes=`head -n1 ${GENOME_SIZE_OUTPUT}`

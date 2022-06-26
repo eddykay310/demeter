@@ -1,32 +1,41 @@
 #!/bin/bash
 start=`date +%s`
+# echo $@
+# app=${BASH_SOURCE[0]}
+app=$0
+app_dir="${app%/*}"
 
 conda activate "bactopia_manually"
 
 help()
 {
-    echo "Usage: source main.sh [ -f | --fasta ID ]
-               [ -rt | --runtype ]
-               [ -c | --cpus ]
-               [ -rm | --ram ]
-               [ -aq | --assembly_qc ]
-               [ -ref | --reference_genome ]
-               [ -anc | --ancestor_genome ]
-               [ -d | --dnds ]
-               [ -ot | --organism_tag ]
-               [ -kt | --keep_transposease ]
-               [ -ps | --pipeline_stage ]
-               [ -s | --scaffold_genome ]
-               [ -pt | --pseudogene_predictor ]
-               [ -h | --help ]"
+    echo "Usage: bash -i main.sh 
+               -i | --fastaID
+               -o | --organism_tag
+               -k | --keep_transposease
+               -s | --scaffold_genome
+               -t | --pseudogene_predictor
+    Running genome assembly
+               -r | --runtype
+               -c | --cpus
+               -m | --ram
+               -a | --assembly_qc
+    Optional arguments
+               -e | --reference_genome
+               -n | --ancestor_genome
+               -d | --dnds
+               -p | --pipeline_stage
+               -u | --stage_5_specfic_run
+               -v | --verbose
+               -h | --help"
 
     set -e
 }
 
-SHORT=-f:,rt:,c:,rm:,aq:,ref:,anc:,d:,ot:,kt:,ps:,s:,pt:,h
-LONG=fastaID:,runtype:,cpus:,ram:,assembly_qc:,reference_genome:,ancestor_genome:,\
-    dnds:,organism_tag:,keep_transposease:,pipeline_stage:,scaffold_genome:,pseudogene_predictor:,help
-OPTS=$(getopt -a -n main --options $SHORT --longoptions $LONG -- "$@")
+# SHORT=i:,r:,c:,m:,a:,e:,n::,d:,o:,k:,p:,s:,t:,h
+# LONG=fastaID:,runtype:,cpus:,ram:,assembly_qc:,reference_genome:,ancestor_genome:,\
+#     dnds:,organism_tag:,keep_transposease:,pipeline_stage:,scaffold_genome:,pseudogene_predictor:,help
+# OPTS=$(getopt -a -n main.sh --options $SHORT --longoptions $LONG -- "$@")
 
 VALID_ARGUMENTS=$# # Returns the count of arguments that are in short or long options
 
@@ -34,16 +43,18 @@ if [ "$VALID_ARGUMENTS" -eq 0 ]; then
   help
 fi
 
-eval set -- "$OPTS"
+# eval set -- "$OPTS"
 
-while :
+###TO-DO add if statements to link inputs and control for wrong combinations of inputs
+###TO-DO add overwriting to args parsable
+while [[ "$#" -gt 0 ]];
 do
   case "$1" in
-    -f | --fastaID )
-      seqid="$2"
+    -i | --fastaID )
+      absolute_path="$2"
       shift 2
       ;;
-    -rt | --runtype )
+    -r | --runtype )
       runtype="$2"
       shift 2
       ;;
@@ -51,19 +62,19 @@ do
         cpus="$2"
         shift 2
         ;;
-    -rm | --ram )
+    -m | --ram )
         ram="$2"
         shift 2
         ;;
-    -aq | --assembly_qc )
+    -a | --assembly_qc )
         assembly_qc_method="$2"
         shift 2
         ;;
-    -ref | --reference_genome )
+    -e | --reference_genome )
         reference_genome="$2"
         shift 2
         ;;
-    -anc | --ancestor_genome )
+    -n | --ancestor_genome )
         ancestor_genome="$2"
         shift 2
         ;;
@@ -71,28 +82,37 @@ do
         dnds="$2"
         shift 2
         ;;    
-    -ot | --organism_tag  )
+    -o | --organism_tag  )
         organism_tag="$2"
         shift 2
         ;;    
-    -kt | --keep_transposease )
+    -k | --keep_transposease )
         keep_transposease="$2"
         shift 2
         ;;    
-    -ps | --pipeline_stage )
+    -p | --pipeline_stage )
         stage="$2"
+        shift 2
+        ;;  
+    -u | --stage_5_specfic_run )
+        stage5="$2"
         shift 2
         ;;    
     -s | --scaffold_genome )
         scaffold="$2"
         shift 2
         ;;   
-    -pt | --pseudogene_predictor )
+    -t | --pseudogene_predictor )
         predictor_type="$2"
         shift 2
         ;;   
-    -h | --help)
-      help
+    -v | --verbose )
+        verbose="$2"
+        shift 2
+        ;;
+    -h | --help )
+        help
+        break
       ;;
     --)
       shift;
@@ -101,13 +121,38 @@ do
     *)
       echo "Unexpected option: $1"
       help
+      break
       ;;
   esac
 done
 
-app_dir=$(realpath main.sh)
-mkdir -p $seqid
-base_dir=$(realpath $seqid)
+# printf "app_dir=${app_dir}
+# base_dir=$absolute_path
+# runtype=$runtype
+# cpus=$cpus
+# ram=$ram
+# assembly_qc_method=$assembly_qc_method
+# reference_genome=$reference_genome
+# ancestor_genome=$ancestor_genome
+# dnds=$dnds
+# organism_tag=$organism_tag
+# keep_transposease="${keep_transposease}"
+# stage="${stage}"
+# stage5="${stage5}"
+# scaffold="${scaffold}"
+# predictor_type="${predictor_type}"\n\n"
+
+base_dir=$absolute_path
+seqid=${absolute_path##*/}
+mkdir -p $base_dir
+
+#Controlling for missing args and correct arg combos
+if [[ "${ancestor_genome##*/}" = "''" ]]; then ancestor_genome=""; fi
+if [[ -z "${stage##*/}" ]]; then stage5=1; else stage=$stage; fi
+if [[ -z "${stage5##*/}" ]]; then stage5="''"; fi
+if [[ -z "${dnds##*/}" ]]; then dnds="''"; fi
+if ! [[ -z "${organism_tag##*/}" ]]; then organism_tag="${organism_tag}${seqid:3}"; else organism_tag=${absolute_path##*/}; fi
+
 echo -e "Starting $seqid\n"
 # base_dir=$1
 # runtype=$2 #either blank for PE or any letter for SE; preferably SE
@@ -115,27 +160,29 @@ echo -e "Starting $seqid\n"
 # cpus=$3
 # ram=$4
 # assembly_qc_method=$5
-! [[ -z "$reference_genome" ]] && reference_genome=$(realpath $reference_genome) || reference_genome="''"
-! [[ -z "$ancestor_genome" ]]  &&  ancestor_genome=$(realpath $ancestor_genome) || ancestor_genome="''"
+! [[ -z "$reference_genome" ]] && reference_genome=$reference_genome || reference_genome="''"
+! [[ -z "$ancestor_genome" ]]  &&  ancestor_genome=$ancestor_genome || ancestor_genome="''"
 # dnds=$8
 # organism_tag=$9
 # keep_transposease="${10}"
 # stage="${11}"
 # scaffold="${12}"
 
-printf "app_dir=app_dir
+printf "############### Inputs #######################
+app_dir=$app_dir
 base_dir=$base_dir
-runtype=$2
-cpus=$3
-ram=$4
-assembly_qc_method=$5
+runtype=$runtype
+cpus=$cpus
+ram=$ram
+assembly_qc_method=$assembly_qc_method
 reference_genome=$reference_genome
 ancestor_genome=$ancestor_genome
-dnds=$8
-organism_tag=$9
-keep_transposease="${10}"
-stage="${11}"
-scaffold="${12}"
+dnds=$dnds
+organism_tag=$organism_tag
+keep_transposease="${keep_transposease}"
+stage="${stage}"
+stage5="${stage5}"
+scaffold="${scaffold}"
 predictor_type="${predictor_type}"\n\n"
 
 re='^[0-9]+$'
@@ -147,7 +194,7 @@ if [ $stage -le 1 ]; then
     echo -e "${base_dir##*/} started at $(date | awk '{print $4}')"
     echo -e "Gathering reads\n" 
     start_gather=`date +%s`
-    ./gather_samples.sh $base_dir
+    ${app_dir}/gather_samples.sh $base_dir
     end_gather=`date +%s`
     runtime=$((end_gather-start_gather))
     hours=$((runtime / 3600)); minutes=$(( (runtime % 3600) / 60 )); seconds=$(( (runtime % 3600) % 60 )) 
@@ -159,7 +206,7 @@ if [ $stage -le 2 ]; then
     echo -e "###########################################################################\n"
     echo -e "Reads QC\n"
     start_qc=`date +%s`
-    ./qc_reads.sh $base_dir $runtype $cpus
+    ${app_dir}/qc_reads.sh $base_dir $runtype $cpus
     end_qc=`date +%s`
     runtime=$((end_qc-start_qc))
     hours=$((runtime / 3600)); minutes=$(( (runtime % 3600) / 60 )); seconds=$(( (runtime % 3600) % 60 )) 
@@ -171,7 +218,7 @@ if [ $stage -le 3 ]; then
     echo -e "###########################################################################\n"
     echo -e "Assembling genome\n"
     start_assembly=`date +%s`
-    ./genome_assembler.sh $base_dir $runtype $cpus $ram $organism_tag
+    ${app_dir}/genome_assembler.sh $base_dir $runtype $cpus $ram $organism_tag
     end_assembly=`date +%s`
     runtime=$((end_assembly-start_assembly))
     hours=$((runtime / 3600)); minutes=$(( (runtime % 3600) / 60 )); seconds=$(( (runtime % 3600) % 60 )) 
@@ -184,7 +231,7 @@ if [ $stage -le 4 ]; then
     echo -e "Genome assembly QC\n"
     start_assembly_qc=`date +%s`
     # ./assembly_qc_scale.sh $base_dir $cpus $assembly_qc_method $organism_tag
-    ./assembly_qc.sh $base_dir $cpus $assembly_qc_method $organism_tag
+    ${app_dir}/assembly_qc.sh $base_dir $cpus $assembly_qc_method $organism_tag
     end_assembly_qc=`date +%s`
     runtime=$((end_assembly_qc-start_assembly_qc))
     hours=$((runtime / 3600)); minutes=$(( (runtime % 3600) / 60 )); seconds=$(( (runtime % 3600) % 60 )) 
@@ -196,7 +243,8 @@ if [ $stage -le 5 ]; then
     echo -e "###########################################################################\n"
     echo -e "Predicting pseudogenome\n"
     start_pseudogene_proc=`date +%s`
-    source ./pseudo_proccessor_main.sh $base_dir $cpus $reference_genome $ancestor_genome $organism_tag $dnds $scaffold $predictor_type
+    source ${app_dir}/pseudo_proccessor_main.sh $base_dir $cpus $reference_genome $ancestor_genome $organism_tag $dnds \
+        $scaffold $predictor_type $stage5
     end_pseudogene_proc=`date +%s`
     runtime=$((end_pseudogene_proc-start_pseudogene_proc))
     hours=$((runtime / 3600)); minutes=$(( (runtime % 3600) / 60 )); seconds=$(( (runtime % 3600) % 60 )) 
@@ -209,7 +257,7 @@ if [ $stage -le 6 ]; then
     echo -e "###########################################################################\n"
     echo -e "Cleaning and writing pseudogenome\n"
     start_pseudogene_cleaning=`date +%s`
-    source ./cleaning_pseudogenome.sh $base_dir $organism_tag $keep_transposease $predictor_type
+    bash -i ${app_dir}/cleaning_pseudogenome.sh $base_dir $organism_tag $keep_transposease $predictor_type ${app_dir}
     end_pseudogene_cleaning=`date +%s`
     runtime=$((end_pseudogene_cleaning-start_pseudogene_cleaning))
     hours=$((runtime / 3600)); minutes=$(( (runtime % 3600) / 60 )); seconds=$(( (runtime % 3600) % 60 )) 
@@ -222,7 +270,7 @@ if [ $stage -le 7 ]; then
     echo -e "###########################################################################\n"
     echo -e "Running COG analysis\n"
     start_COG_analysis=`date +%s`
-    source ./cog_classifier.sh $base_dir $organism_tag $cpus
+    source ${app_dir}/cog_classifier.sh $base_dir $organism_tag $cpus
     end_COG_analysis=`date +%s`
     runtime=$((end_COG_analysis-start_COG_analysis))
     hours=$((runtime / 3600)); minutes=$(( (runtime % 3600) / 60 )); seconds=$(( (runtime % 3600) % 60 )) 
