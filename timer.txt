@@ -1,9 +1,0 @@
-,0:0:2
-,0:0:2
-,0:0:1
-,0:0:2
-,0:0:1
-,0:0:2
-/mnt/e/MPhil_Thesis/bioinformatics/Australian_study_seqs/v0.1/SRR6346242,0:18:56
-/mnt/e/MPhil_Thesis/bioinformatics/Australian_study_seqs/v0.1/SRR6346242,0:1:31
-/mnt/e/MPhil_Thesis/bioinformatics/Australian_study_seqs/v0.1/SRR6346242,0:11:8
