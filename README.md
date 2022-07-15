@@ -1,14 +1,6 @@
 # **Demeter**
 
 
-## Contents
-
-[Demeter](#**Demeter**)
-[Table of Content](##Contents)
-[Overview](##Overview)
-[Installation](##Installation)
-[Usage](##Usage)
-
 ## Overview
 
 Demeter is a commandline tool for bacteria pseudogene predictor and pan-pseudogenome analyzer. It wraps three different pseudogene prediction tool including Prokka, DFAST and Pseudofinder. This tool was built to help with understanding the evolution of bacteria from the perspective on the accumulation of pseudogenes. It further provides COG analysis of pseudogenes and other quantitative and qualitative analysis of bacterial pseudogenes to provide insight into the variations in pseudogenes that may indicate evolutionary trends in bacteria. 
