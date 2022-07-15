@@ -17,13 +17,13 @@ git clone https://github.com/eddykay310/demeter.git
 ```
 ## Create environments
 ```
-conda create --name bactopia_manually --file requirements/base_requirement.txt
+conda create --name bactopia_manually --file <path>/demeter/requirements/base_requirement.txt
 ```
 ```
-conda create --name pseudofinder --file requirements/PF_requirement.txt
+conda create --name pseudofinder --file <path>/demeter/requirements/PF_requirement.txt
 ```
 ```
-conda create --name cog_classifier --file requirements/cog_requirement.txt
+conda create --name cog_classifier --file <path>/demeter/requirements/cog_requirement.txt
 ```
 
 ## Usage
@@ -33,13 +33,13 @@ conda create --name cog_classifier --file requirements/cog_requirement.txt
 Using paired-end Illumina reads
 
 ```
-bash -i path/demeter/main.sh -i path/[SRA gzipped fasta] -r PE -c 4 -m 8 -a U50 -t all
+bash -i path/demeter/main.sh -i <path>/[SRA gzipped fasta] -r PE -c 4 -m 8 -a U50 -t all
 ```
 
 Using assembled whole genome
 
 ```
-bash -i path/demeter/main.sh -i path/[SRA gzipped fasta] -r PE -c 4 -m 8 -a U50 -p 5 -t all
+bash -i path/demeter/main.sh -i <path>/[SRA gzipped fasta] -r PE -c 4 -m 8 -a U50 -p 5 -t all
 ```
 
 **Options**
