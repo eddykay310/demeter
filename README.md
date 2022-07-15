@@ -11,14 +11,18 @@ Demeter takes Illumina reads or an assemble whole genome and assembles and annot
 
 ## Installation
 
-```
 ## Clone repo
+```
 git clone https://github.com/eddykay310/demeter.git
 ```
-```
 ## Create environments
+```
 conda create --name bactopia_manually --file requirements/base_requirement.txt
+```
+```
 conda create --name pseudofinder --file requirements/PF_requirement.txt
+```
+```
 conda create --name cog_classifier --file requirements/cog_requirement.txt
 ```
 
