@@ -7,7 +7,7 @@ Demeter is a commandline tool for bacteria pseudogene predictor and pan-pseudoge
 
 Demeter takes Illumina reads or an assemble whole genome and assembles and annotates the bacterial genome from stage 1 to stage 4 based on the input parameters. Pseudogene prediction can be done by one tool or all tools to provide a comprehensive list of predicted pseudogenes in stage 5. Downstream analysis are then performed to provide insights into the pan-pseudogenome of different bacterial strains in stage 7 
 
-![Pipeline flow diagram](https://raw.githubusercontent.com/eddykay310/demeter/master/img/flow.png)
+![Pipeline flow diagram](https://raw.githubusercontent.com/eddykay310/demeter/main/img/flow.png)
 
 ## Installation
 
