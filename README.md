@@ -1,22 +1,21 @@
 # **Demeter**
 
 
+## Contents
 
-## Table of Contents
-
-------
-
-[TOC]
+[Demeter](#**Demeter**)
+[Table of Content](##Contents)
+[Overview](##Overview)
+[Installation](##Installation)
+[Usage](##Usage)
 
 ## Overview
-
-------
 
 Demeter is a commandline tool for bacteria pseudogene predictor and pan-pseudogenome analyzer. It wraps three different pseudogene prediction tool including Prokka, DFAST and Pseudofinder. This tool was built to help with understanding the evolution of bacteria from the perspective on the accumulation of pseudogenes. It further provides COG analysis of pseudogenes and other quantitative and qualitative analysis of bacterial pseudogenes to provide insight into the variations in pseudogenes that may indicate evolutionary trends in bacteria. 
 
 Demeter takes Illumina reads or an assemble whole genome and assembles and annotates the bacterial genome from stage 1 to stage 4 based on the input parameters. Pseudogene prediction can be done by one tool or all tools to provide a comprehensive list of predicted pseudogenes in stage 5. Downstream analysis are then performed to provide insights into the pan-pseudogenome of different bacterial strains in stage 7 
 
-![image-20220712133902287](https://github.com/eddykay310/demeter/img/flow.png)
+![Pipeline flow diagram](https://github.com/eddykay310/demeter/tree/main/img)
 
 ## Installation
 
@@ -31,8 +30,6 @@ conda create --name cog_classifier --file requirements/cog_requirement.txt
 ```
 
 ## Usage
-
-------
 
 **Basic**
 
